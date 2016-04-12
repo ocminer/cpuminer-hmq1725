@@ -114,7 +114,7 @@ static const char *algo_names[] = {
 	"keccak",
 	"heavy",
 	"neoscrypt",
-	"hmq1725",
+	"quark",
 	"anime",
 	"blake",
 	"blakecoin",
@@ -261,7 +261,7 @@ Options:\n\
                           nist5        Nist5\n\
                           pluck        Pluck:128 (Supcoin)\n\
                           pentablake   Pentablake\n\
-                          hmq1725      HMQ1725 (ESP)\n\
+                          quark        HMQ1725 (ESP)\n\
                           qubit        Qubit\n\
                           shavite3     Shavite3\n\
                           skein        Skein+Sha (Skeincoin)\n\
