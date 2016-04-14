@@ -1755,12 +1755,12 @@ static void stratum_gen_work(struct stratum_ctx *sctx, struct work *work)
 			case ALGO_SCRYPT:
 			case ALGO_NEOSCRYPT:
 			case ALGO_PLUCK:
+			case ALGO_QUARK:
 				diff_to_target(work->target, sctx->job.diff / (65536.0 * opt_diff_factor));
 				break;
 			case ALGO_FRESH:
 			case ALGO_DMD_GR:
 			case ALGO_GROESTL:
-			case ALGO_QUARK:
 				diff_to_target(work->target, sctx->job.diff / (256.0 * opt_diff_factor));
 				break;
 			case ALGO_KECCAK:
@@ -3100,10 +3100,10 @@ int main(int argc, char *argv[]) {
 	if (!opt_n_threads)
 		opt_n_threads = 1;
 
-//	if (opt_algo == ALGO_QUARK) {
-//		init_quarkhash_contexts();
-//	} else if(opt_algo == ALGO_CRYPTONIGHT) {
-	if(opt_algo == ALGO_CRYPTONIGHT) {
+	if (opt_algo == ALGO_QUARK) {
+		init_quarkhash_contexts();
+	} else if(opt_algo == ALGO_CRYPTONIGHT) {
+//	if(opt_algo == ALGO_CRYPTONIGHT) {
 		jsonrpc_2 = true;
 		aes_ni_supported = has_aes_ni();
 		applog(LOG_INFO, "Using JSON-RPC 2.0");

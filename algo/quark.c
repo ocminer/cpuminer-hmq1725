@@ -23,219 +23,266 @@
 #include "sha3/sph_haval.h"
 
 
+/* Move init out of loop, so init once externally, and then use one single memcpy with that bigger memory block */
+typedef struct {
+	sph_blake512_context 	blake1, blake2;
+	sph_bmw512_context		bmw1, bmw2, bmw3;
+	sph_groestl512_context	groestl1, groestl2;
+	sph_skein512_context	skein1, skein2;
+	sph_jh512_context		jh1, jh2;
+	sph_keccak512_context	keccak1, keccak2;
+
+ sph_luffa512_context     luffa1, luffa2;
+ sph_cubehash512_context  cubehash1;
+ sph_shavite512_context   shavite1, shavite2;
+ sph_simd512_context      simd1, simd2;
+ sph_echo512_context      echo1, echo2;
+ sph_hamsi512_context     hamsi1;
+ sph_fugue512_context     fugue1, fugue2;
+ sph_shabal512_context    shabal1;
+ sph_whirlpool_context    whirlpool1, whirlpool2, whirlpool3, whirlpool4;
+ sph_sha512_context       sha1, sha2;
+ sph_haval256_5_context   haval1, haval2;
+
+
+} quarkhash_context_holder;
+
+static quarkhash_context_holder base_contexts;
+
+void init_quarkhash_contexts()
+{
+    sph_blake512_init(&base_contexts.blake1);
+    sph_bmw512_init(&base_contexts.bmw1);
+    sph_groestl512_init(&base_contexts.groestl1);
+    sph_skein512_init(&base_contexts.skein1);
+    sph_groestl512_init(&base_contexts.groestl2);
+    sph_jh512_init(&base_contexts.jh1);	
+    sph_blake512_init(&base_contexts.blake2);	
+    sph_bmw512_init(&base_contexts.bmw2);	
+    sph_keccak512_init(&base_contexts.keccak1);	
+    sph_skein512_init(&base_contexts.skein2);
+    sph_keccak512_init(&base_contexts.keccak2);
+    sph_jh512_init(&base_contexts.jh2);	
+
+sph_bmw512_init(&base_contexts.bmw2);
+sph_bmw512_init(&base_contexts.bmw3);
+sph_luffa512_init(&base_contexts.luffa1);
+sph_luffa512_init(&base_contexts.luffa2);
+sph_cubehash512_init(&base_contexts.cubehash1);
+sph_shavite512_init(&base_contexts.shavite1);
+sph_shavite512_init(&base_contexts.shavite2);
+sph_simd512_init(&base_contexts.simd1);
+sph_simd512_init(&base_contexts.simd2);
+sph_echo512_init(&base_contexts.echo1);
+sph_echo512_init(&base_contexts.echo2);
+sph_hamsi512_init(&base_contexts.hamsi1);
+sph_fugue512_init(&base_contexts.fugue1);
+sph_fugue512_init(&base_contexts.fugue2);
+sph_shabal512_init(&base_contexts.shabal1);
+sph_whirlpool_init(&base_contexts.whirlpool1);
+sph_whirlpool_init(&base_contexts.whirlpool2);
+sph_whirlpool_init(&base_contexts.whirlpool3);
+sph_whirlpool_init(&base_contexts.whirlpool4);
+sph_sha512_init(&base_contexts.sha1);
+sph_sha512_init(&base_contexts.sha2);
+sph_haval256_5_init(&base_contexts.haval1);
+sph_haval256_5_init(&base_contexts.haval2);
+
+}
 
 extern void quarkhash(void *state, const void *input)
 {
 
-  sph_blake512_context     ctx_blake;
-    sph_bmw512_context       ctx_bmw;
-    sph_groestl512_context   ctx_groestl;
-    sph_jh512_context        ctx_jh;
-    sph_keccak512_context    ctx_keccak;
-    sph_skein512_context     ctx_skein;
-
-   sph_luffa512_context     ctx_luffa;
-   sph_cubehash512_context  ctx_cubehash;
-   sph_shavite512_context   ctx_shavite;
-   sph_simd512_context      ctx_simd;
-   sph_echo512_context      ctx_echo;
-   sph_hamsi512_context     ctx_hamsi;
-   sph_fugue512_context     ctx_fugue;
-   sph_shabal512_context    ctx_shabal;
-   sph_whirlpool_context    ctx_whirlpool;
-   sph_sha512_context       ctx_sha2;
-   sph_haval256_5_context   ctx_haval;
+	quarkhash_context_holder ctx;
 
     uint32_t mask = 24;
     uint32_t zero = 0;
 
-    uint32_t hashA[16], hashB[16];
+	//these uint512 in the c++ source of the client are backed by an array of uint32
+    uint32_t hashA[25], hashB[25];	
+	
 
+	//do one memcopy to get fresh contexts, its faster even with a larger block then issuing 9 memcopies
+	memcpy(&ctx, &base_contexts, sizeof(base_contexts));
 
-  sph_bmw512_init(&ctx_bmw);
-    sph_bmw512 (&ctx_bmw, input, 80);
-    sph_bmw512_close (&ctx_bmw, hashA);  //0
+	
+	
+    sph_bmw512 (&ctx.bmw1, input, 80);    //0
+    sph_bmw512_close(&ctx.bmw1, hashA);   //1
 
+    sph_whirlpool (&ctx.whirlpool1, hashA, 64);    //0
+    sph_whirlpool_close(&ctx.whirlpool1, hashB);   //1
 
-    sph_whirlpool_init(&ctx_whirlpool);
-    sph_whirlpool (&ctx_whirlpool, hashA, 64);    //0
-    sph_whirlpool_close(&ctx_whirlpool, hashB);   //1
-
-
+	
     if ((hashB[0] & mask) != zero)   //1
     {
-        sph_groestl512_init(&ctx_groestl);
-        sph_groestl512 (&ctx_groestl, hashB, 64); //1
-        sph_groestl512_close(&ctx_groestl, hashA); //2
+        sph_groestl512 (&ctx.groestl1, hashB, 64); //1
+        sph_groestl512_close(&ctx.groestl1, hashA); //2
     }
     else
     {
-        sph_skein512_init(&ctx_skein);
-        sph_skein512 (&ctx_skein, hashB, 64); //1
-        sph_skein512_close(&ctx_skein, hashA); //2
+        sph_skein512 (&ctx.skein1, hashB, 64); //1
+        sph_skein512_close(&ctx.skein1, hashA); //2
     }
+	
+    sph_jh512 (&ctx.jh1, hashA, 64); //3
+    sph_jh512_close(&ctx.jh1, hashB); //4
 
+    sph_keccak512 (&ctx.keccak1, hashB, 64); //2
+    sph_keccak512_close(&ctx.keccak1, hashA); //3
 
-    sph_jh512_init(&ctx_jh);
-    sph_jh512 (&ctx_jh, hashA, 64); //2
-    sph_jh512_close(&ctx_jh, hashB); //3
-
-    sph_keccak512_init(&ctx_keccak);
-    sph_keccak512 (&ctx_keccak, hashB, 64); //3
-    sph_keccak512_close(&ctx_keccak, hashA); //4
 
     if ((hashA[0] & mask) != zero) //4
     {
-        sph_blake512_init(&ctx_blake);
-        sph_blake512 (&ctx_blake, hashA, 64); //
-        sph_blake512_close(&ctx_blake, hashB); //5
+        sph_blake512 (&ctx.blake1, hashA, 64); //
+        sph_blake512_close(&ctx.blake1, hashB); //5
     }
     else
     {
-        sph_bmw512_init(&ctx_bmw);
-        sph_bmw512 (&ctx_bmw, hashA, 64); //4
-        sph_bmw512_close(&ctx_bmw, hashB);   //5
+        sph_bmw512 (&ctx.bmw2, hashA, 64); //4
+        sph_bmw512_close(&ctx.bmw2, hashB);   //5
     }
+    
+    sph_luffa512 (&ctx.luffa1, hashB, 64); //5
+    sph_luffa512_close(&ctx.luffa1, hashA); //6
 
-    sph_luffa512_init(&ctx_luffa);
-    sph_luffa512 (&ctx_luffa,hashB, 64); //5
-    sph_luffa512_close(&ctx_luffa, hashA); //6
-
-    sph_cubehash512_init(&ctx_cubehash);
-    sph_cubehash512 (&ctx_cubehash, hashA, 64); //6
-    sph_cubehash512_close(&ctx_cubehash, hashB); //7
+    sph_cubehash512 (&ctx.cubehash1, hashA, 64); //6
+    sph_cubehash512_close(&ctx.cubehash1, hashB); //7
 
     if ((hashB[0] & mask) != zero) //7
     {
-        sph_keccak512_init(&ctx_keccak);
-        sph_keccak512 (&ctx_keccak, hashB, 64); //
-        sph_keccak512_close(&ctx_keccak, hashA); //8
+        sph_keccak512 (&ctx.keccak2, hashB, 64); //
+        sph_keccak512_close(&ctx.keccak2, hashA); //8
     }
     else
     {
-        sph_jh512_init(&ctx_jh);
-        sph_jh512 (&ctx_jh, hashB, 64); //7
-        sph_jh512_close(&ctx_jh, hashA); //8
+        sph_jh512 (&ctx.jh2, hashB, 64); //7
+        sph_jh512_close(&ctx.jh2, hashA); //8
     }
 
 
-/**/
 
-    sph_shavite512_init(&ctx_shavite);
-    sph_shavite512 (&ctx_shavite,hashA, 64); //5
-    sph_shavite512_close(&ctx_shavite, hashB); //6
 
-    sph_simd512_init(&ctx_simd);
-    sph_simd512 (&ctx_simd, hashB, 64); //6
-    sph_simd512_close(&ctx_simd, hashA); //7
 
+
+    sph_shavite512 (&ctx.shavite1, hashA, 64); //3
+    sph_shavite512_close(&ctx.shavite1, hashB); //4
+
+    sph_simd512 (&ctx.simd1, hashB, 64); //2
+    sph_simd512_close(&ctx.simd1, hashA); //3
+
+    
     if ((hashA[0] & mask) != zero) //4
     {
-        sph_whirlpool_init(&ctx_whirlpool);
-        sph_whirlpool (&ctx_whirlpool, hashA, 64); //
-        sph_whirlpool_close(&ctx_whirlpool, hashB); //5
+        sph_whirlpool (&ctx.whirlpool2, hashA, 64); //
+        sph_whirlpool_close(&ctx.whirlpool2, hashB); //5
     }
     else
     {
-        sph_haval256_5_init(&ctx_haval);
-        sph_haval256_5 (&ctx_haval, hashA, 64); //4
-        sph_haval256_5_close(&ctx_haval, hashB);   //5
+        sph_haval256_5 (&ctx.haval1, hashA, 64); //4
+        sph_haval256_5_close(&ctx.haval1, hashB);   //5
+	memset(&hashB[8], 0, 32);
     }
 
-    sph_echo512_init(&ctx_echo);
-    sph_echo512 (&ctx_echo,hashB, 64); //5
-    sph_echo512_close(&ctx_echo, hashA); //6
 
-    sph_blake512_init(&ctx_blake);
-    sph_blake512 (&ctx_blake, hashA, 64); //6
-    sph_blake512_close(&ctx_blake, hashB); //7
+
+
+
+
+    sph_echo512 (&ctx.echo1, hashB, 64); //5
+    sph_echo512_close(&ctx.echo1, hashA); //6
+
+    sph_blake512 (&ctx.blake2, hashA, 64); //6
+    sph_blake512_close(&ctx.blake2, hashB); //7
 
     if ((hashB[0] & mask) != zero) //7
     {
-        sph_shavite512_init(&ctx_shavite);
-        sph_shavite512 (&ctx_shavite, hashB, 64); //
-        sph_shavite512_close(&ctx_shavite, hashA); //8
+        sph_shavite512 (&ctx.shavite2, hashB, 64); //
+        sph_shavite512_close(&ctx.shavite2, hashA); //8
     }
     else
     {
-        sph_luffa512_init(&ctx_luffa);
-        sph_luffa512 (&ctx_luffa, hashB, 64); //7
-        sph_luffa512_close(&ctx_luffa, hashA); //8
+        sph_luffa512 (&ctx.luffa2, hashB, 64); //7
+        sph_luffa512_close(&ctx.luffa2, hashA); //8
     }
 
 
-    sph_hamsi512_init(&ctx_hamsi);
-    sph_hamsi512 (&ctx_hamsi,hashA, 64); //5
-    sph_hamsi512_close(&ctx_hamsi, hashB); //6
 
-    sph_fugue512_init(&ctx_fugue);
-    sph_fugue512 (&ctx_fugue, hashB, 64); //6
-    sph_fugue512_close(&ctx_fugue, hashA); //7
+
+
+
+    sph_hamsi512 (&ctx.hamsi1, hashA, 64); //3
+    sph_hamsi512_close(&ctx.hamsi1, hashB); //4
+
+    sph_fugue512 (&ctx.fugue1, hashB, 64); //2   ////
+    sph_fugue512_close(&ctx.fugue1, hashA); //3 
 
 
     if ((hashA[0] & mask) != zero) //4
     {
-        sph_echo512_init(&ctx_echo);
-        sph_echo512 (&ctx_echo, hashA, 64); //
-        sph_echo512_close(&ctx_echo, hashB); //5
+        sph_echo512 (&ctx.echo2, hashA, 64); //
+        sph_echo512_close(&ctx.echo2, hashB); //5
     }
     else
     {
-        sph_simd512_init(&ctx_simd);
-        sph_simd512 (&ctx_simd, hashA, 64); //4
-        sph_simd512_close(&ctx_simd, hashB);   //5
+        sph_simd512 (&ctx.simd2, hashA, 64); //4
+        sph_simd512_close(&ctx.simd2, hashB);   //5
     }
 
-    sph_shabal512_init(&ctx_shabal);
-    sph_shabal512 (&ctx_shabal,hashB, 64); //5
-    sph_shabal512_close(&ctx_shabal, hashA); //6
 
-    sph_whirlpool_init(&ctx_whirlpool);
-    sph_whirlpool (&ctx_whirlpool, hashA, 64); //6
-    sph_whirlpool_close(&ctx_whirlpool, hashB); //7
 
-   if ((hashB[0] & mask) != zero) //7
+
+
+    sph_shabal512 (&ctx.shabal1, hashB, 64); //5
+    sph_shabal512_close(&ctx.shabal1, hashA); //6
+
+    sph_whirlpool (&ctx.whirlpool3, hashA, 64); //6
+    sph_whirlpool_close(&ctx.whirlpool3, hashB); //7
+
+    if ((hashB[0] & mask) != zero) //7
     {
-        sph_fugue512_init(&ctx_fugue);
-        sph_fugue512 (&ctx_fugue, hashB, 64); //
-        sph_fugue512_close(&ctx_fugue, hashA); //8
+        sph_fugue512 (&ctx.fugue2, hashB, 64); //
+        sph_fugue512_close(&ctx.fugue2, hashA); //8
     }
     else
     {
-        sph_sha512_init(&ctx_sha2);
-        sph_sha512 (&ctx_sha2, hashB, 64); //7
-        sph_sha512_close(&ctx_sha2, hashA); //8
+        sph_sha512 (&ctx.sha1, hashB, 64); //7
+        sph_sha512_close(&ctx.sha1, hashA); //8
     }
 
-    sph_groestl512_init(&ctx_groestl);
-    sph_groestl512 (&ctx_groestl,hashA, 64); //5 
-    sph_groestl512_close(&ctx_groestl, hashB); //6 
 
-    sph_sha512_init(&ctx_sha2);
-    sph_sha512 (&ctx_sha2, hashB, 64); //6
-    sph_sha512_close(&ctx_sha2, hashA); //7
+
+
+
+
+    sph_groestl512 (&ctx.groestl2, hashA, 64); //3
+    sph_groestl512_close(&ctx.groestl2, hashB); //4
+
+    sph_sha512 (&ctx.sha2, hashB, 64); //2 
+    sph_sha512_close(&ctx.sha2, hashA); //3 
 
 
     if ((hashA[0] & mask) != zero) //4
     {
-        sph_haval256_5_init(&ctx_haval);
-        sph_haval256_5 (&ctx_haval, hashA, 64); //
-        sph_haval256_5_close(&ctx_haval, hashB); //5
+        sph_haval256_5 (&ctx.haval2, hashA, 64); //
+        sph_haval256_5_close(&ctx.haval2, hashB); //5
+	memset(&hashB[8], 0, 32);
     }
     else
     {
-        sph_whirlpool_init(&ctx_whirlpool);
-        sph_whirlpool (&ctx_whirlpool, hashA, 64); //4
-        sph_whirlpool_close(&ctx_whirlpool, hashB);   //5
+        sph_whirlpool (&ctx.whirlpool4, hashA, 64); //4
+        sph_whirlpool_close(&ctx.whirlpool4, hashB);   //5
     }
 
 
-    sph_bmw512_init(&ctx_bmw);
-    sph_bmw512 (&ctx_bmw,hashB, 64); //5
-    sph_bmw512_close(&ctx_bmw, hashA); //6
+    sph_bmw512 (&ctx.bmw3, hashB, 64); //5
+    sph_bmw512_close(&ctx.bmw3, hashA); //6
+
+
 
 
 	memcpy(state, hashA, 32);
+
 	
 }
 
